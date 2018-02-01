@@ -215,7 +215,7 @@ object GeneralNaiveBayes extends DefaultParamsReadable[GeneralNaiveBayes] {
   /**
     * The evidence value to use if the conditional probability is exactly 1 (rare)
     * The evidence is actually infinite in this case, but it's better to limit it
-    * to allow the small possibility of other class values in the prediction.
+    * to allow the small possibility of other class values in the prediction (see Laplace smoothing).
     */
   val MAX_LOG_PROB = 100.0
 
@@ -243,9 +243,6 @@ object GeneralNaiveBayes extends DefaultParamsReadable[GeneralNaiveBayes] {
     // scalastyle:on println println(...)
   }
 
-  def main(args: Array[String]): Unit = {
-    println("Hello from main of class")
-  }
 }
 
 
@@ -262,10 +259,10 @@ object GeneralNaiveBayes extends DefaultParamsReadable[GeneralNaiveBayes] {
   */
 @Since("2.3.0")
 class GeneralNaiveBayesModel private[ml] (
-                                           @Since("2.3.0") override val uid: String,
-                                           @Since("2.3.0") val labelWeights: Vector,
-                                           @Since("2.3.0") val modelData: Array[Array[Array[Double]]],
-                                           @Since("2.3.0") val laplaceSmoothing: Double)
+             @Since("2.3.0") override val uid: String,
+             @Since("2.3.0") val labelWeights: Vector,
+             @Since("2.3.0") val modelData: Array[Array[Array[Double]]],
+             @Since("2.3.0") val laplaceSmoothing: Double)
   extends ProbabilisticClassificationModel[Vector, GeneralNaiveBayesModel]
     with GeneralNaiveBayesParams with MLWritable {
 
@@ -295,6 +292,7 @@ class GeneralNaiveBayesModel private[ml] (
       })
     })
   })
+
   /**
     * Convert the conditional probabilities to log probabilities.
     * Evidence is -log(1 - conditionalProbability)
@@ -379,7 +377,7 @@ object GeneralNaiveBayesModel extends MLReadable[GeneralNaiveBayesModel] {
 
   /** [[MLWriter]] instance for [[GeneralNaiveBayesModel]] */
   private[GeneralNaiveBayesModel] class GeneralNaiveBayesModelWriter(
-                                                                      instance: GeneralNaiveBayesModel) extends MLWriter {
+             instance: GeneralNaiveBayesModel) extends MLWriter {
 
     private case class Data(labelWeights: Vector, modelDataStr: String, laplaceSmoothing: Double)
 

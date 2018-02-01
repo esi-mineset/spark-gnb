@@ -40,20 +40,9 @@ class GeneralNaiveBayesSuite extends FunSuite with DataFrameSuiteBase with Share
   implicit val doubleEq: Equality[Double] = TolerantNumerics.tolerantDoubleEquality(epsilon)
 
   test("params") {
-
-    val model = new GeneralNaiveBayesModel("gnb",
-      labelWeights = Vectors.dense(Array(0.2, 0.7, 0.1)),
-      // Dimensions are [featureIdx][featureValue][weight for label(i)]
-      modelData = Array(
-        Array(Array(0.0, 1.0, 1.0), Array(1.0, 1.0, 1.0), Array(1.0, 1.0, 1.0)),
-        Array(Array(1.0, 1.0, 1.0), Array(1.0, 1.0, 1.0), Array(1.0, 1.0, 1.0)),
-        Array(Array(1.0, 1.0, 1.0), Array(1.0, 1.0, 1.0)),
-        Array(
-          Array(1.0, 1.0, 1.0), Array(1.0, 1.0, 1.0), Array(1.0, 1.0, 1.0), Array(1.0, 1.0, 1.0)
-        )
-      ),
-      laplaceSmoothing = 0.2)
-
+    val model = createSimpleGnbModel()
+    assertResult(3) {model.numClasses}
+    assertResult(0.2) {model.laplaceSmoothing}
     checkParams(model)
   }
 
@@ -689,6 +678,21 @@ object GeneralNaiveBayesSuite {
       if (p < sum) return j
     }
     -1
+  }
+
+  def createSimpleGnbModel(): GeneralNaiveBayesModel = {
+    new GeneralNaiveBayesModel("gnb",
+      labelWeights = Vectors.dense(Array(0.2, 0.7, 0.1)),
+      // Dimensions are [featureIdx][featureValue][weight for label(i)]
+      modelData = Array(
+        Array(Array(0.0, 1.0, 1.0), Array(1.0, 1.0, 1.0), Array(1.0, 1.0, 1.0)),
+        Array(Array(1.0, 1.0, 1.0), Array(1.0, 1.0, 1.0), Array(1.0, 1.0, 1.0)),
+        Array(Array(1.0, 1.0, 1.0), Array(1.0, 1.0, 1.0)),
+        Array(
+          Array(1.0, 1.0, 1.0), Array(1.0, 1.0, 1.0), Array(1.0, 1.0, 1.0), Array(1.0, 1.0, 1.0)
+        )
+      ),
+      laplaceSmoothing = 0.2)
   }
 
   /**

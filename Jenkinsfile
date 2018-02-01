@@ -25,11 +25,16 @@ pipeline {
         stage ('build') {
             steps {
                 echo "PATH is: $PATH"
-                // this builds and tests
                 cmd("sbt assembly")
             }
         }
 
+        stage ('test') {
+            steps {
+                echo "PATH is: $PATH"
+                cmd("sbt test")
+            }
+        }
         stage('documentation') {
             steps {
                 cmd("sbt doc")
