@@ -1,5 +1,5 @@
 name := "spark-gnb"
-version := "1.0-SPARK-2.1.1-SNAPHSOT"
+version := "1.1-SPARK-2.1.1-SNAPHSOT"
 organization := "org.apache.spark"
 scalaVersion := "2.11.11"
 spName := "apache/spark-gnb"
