@@ -17,13 +17,298 @@
 
 package org.apache.spark.ml.classification
 
+import scala.util.Random
+import com.holdenkarau.spark.testing.{DataFrameSuiteBase, DataframeGenerator, SharedSparkContext}
+import org.apache.spark.ml.feature.LabeledPoint
+import org.apache.spark.ml.linalg.Vectors
+import org.apache.spark.ml.param.{ParamMap, Params}
+import org.apache.spark.sql._
+import org.scalatest.prop.Checkers
+import org.scalatest.{BeforeAndAfterAll, FunSuite}
 
-import org.scalatest.FunSuite
 
-class GeneralNaiveBayesSuite extends FunSuite {
-  test("foo_gnb") {
-    assertResult(true) { 5 == 5 }
+class GeneralNaiveBayesSuite extends FunSuite with DataFrameSuiteBase with SharedSparkContext with Checkers {
+
+  /*
+  override def beforeAll(): Unit = {
+    sparkSession = SparkSession.builder.
+      master("local[4]")
+      .appName("spark test")
+      .getOrCreate()
+    dataset = generateSmallRandomNaiveBayesInput(42).toDF()
+  }*/
+
+  test("test initializing spark context") {
+    val list = List(1, 2, 3, 4)
+    val rdd = sc.parallelize(list)
+
+    assert(rdd.count === list.length)
   }
+
+  test("simple test") {
+    val sqlCtx = sqlContext
+    import sqlCtx.implicits._
+
+    val input1 = sc.parallelize(List(1, 2, 3)).toDF
+    assertDataFrameEquals(input1, input1) // equal
+
+    val input2 = sc.parallelize(List(4, 5, 6)).toDF
+    intercept[org.scalatest.exceptions.TestFailedException] {
+      assertDataFrameEquals(input1, input2) // not equal
+    }
+  }
+
+  test("params") {
+    //ParamsSuite.checkParams(new GeneralNaiveBayes)
+
+    val model = new GeneralNaiveBayesModel("gnb",
+      labelWeights = Vectors.dense(Array(0.2, 0.7, 0.1)),
+      // Dimensions are [featureIdx][featureValue][weight for label(i)]
+      modelData = Array(
+        Array(Array(0.0, 1.0, 1.0), Array(1.0, 1.0, 1.0), Array(1.0, 1.0, 1.0)),
+        Array(Array(1.0, 1.0, 1.0), Array(1.0, 1.0, 1.0), Array(1.0, 1.0, 1.0)),
+        Array(Array(1.0, 1.0, 1.0), Array(1.0, 1.0, 1.0)),
+        Array(
+          Array(1.0, 1.0, 1.0), Array(1.0, 1.0, 1.0), Array(1.0, 1.0, 1.0), Array(1.0, 1.0, 1.0)
+        )
+      ),
+      laplaceSmoothing = 0.2)
+
+    checkParams(model)
+  }
+
+  test("naive bayes: default params") {
+    val nb = new GeneralNaiveBayes
+    assert(nb.getLabelCol === "label")
+    assert(nb.getFeaturesCol === "features")
+    assert(nb.getPredictionCol === "prediction")
+    assert(nb.getSmoothing === 1.0)
+  }
+
+  test("Naive Bayes Small with random Labels") {
+
+    val sqlCtx = sqlContext
+    import sqlCtx.implicits._
+
+    val testDataset =
+      generateSmallRandomNaiveBayesInput(42).toDF()
+
+    val nb = new GeneralNaiveBayes().setSmoothing(1.0)
+    val model = nb.fit(testDataset)
+
+    val expLabelWeights = Array(2.0, 1.0, 3.0)
+    val expModelData = Array(
+      Array(Array(1.0, 1.0, 1.0), Array(0.0, 0.0, 1.0), Array(1.0, 0.0, 1.0)),
+      Array(Array(1.0, 0.0, 0.0), Array(0.0, 1.0, 1.0), Array(1.0, 0.0, 2.0)),
+      Array(Array(2.0, 1.0, 2.0), Array(0.0, 0.0, 1.0)),
+      Array(Array(1.0, 0.0, 0.0), Array(0.0, 1.0, 0.0), Array(1.0, 0.0, 2.0), Array(0.0, 0.0, 1.0))
+    )
+
+    val expLogProbabilityData = Array(
+      Array(
+        Array(-0.916290731874155, -0.6931471805599453, -1.0986122886681098),
+        Array(-1.6094379124341003, -1.3862943611198906, -1.0986122886681098),
+        Array(-0.916290731874155, -1.3862943611198906, -1.0986122886681098)),
+      Array(
+        Array(-0.916290731874155, -1.3862943611198906, -1.791759469228055),
+        Array(-1.6094379124341003, -0.6931471805599453, -1.0986122886681098),
+        Array(-0.916290731874155, -1.3862943611198906, -0.6931471805599453)),
+      Array(
+        Array(-0.5108256237659907, -0.6931471805599453, -0.6931471805599453),
+        Array(-1.6094379124341003, -1.3862943611198906, -1.0986122886681098)),
+      Array(
+        Array(-0.916290731874155, -1.3862943611198906, -1.791759469228055),
+        Array(-1.6094379124341003, -0.6931471805599453, -1.791759469228055),
+        Array(-0.916290731874155, -1.3862943611198906, -0.6931471805599453),
+        Array(-1.6094379124341003, -1.3862943611198906, -1.0986122886681098))
+    )
+
+    validateModelFit(expLabelWeights, expModelData, Some(expLogProbabilityData), model)
+    assert(model.hasParent)
+
+    val validationDataset =
+      generateSmallRandomNaiveBayesInput(17).toDF()
+
+    val predictionAndLabels: DataFrame =
+      model.transform(validationDataset).select("prediction", "label")
+
+    // Since the labels are random, we do not expect high accuracy
+    validatePrediction(predictionAndLabels, 0.2)
+  }
+
+  /**
+    * @param predictionAndLabels the predictions with label
+    * @param expPctCorrect the expected number of correct predictions.
+    */
+  def validatePrediction(predictionAndLabels: DataFrame, expPctCorrect: Double): Unit = {
+    val numOfCorrectPredictions = predictionAndLabels.collect().count {
+      case Row(prediction: Double, label: Double) =>
+        prediction == label
+    }
+    // At least expPctCorrect of the predictions should be correct.
+    val totalRows = predictionAndLabels.count()
+    val numExpectedCorrectPredictions = expPctCorrect * totalRows
+    assert(numOfCorrectPredictions > numExpectedCorrectPredictions,
+      s"Expected at least $numExpectedCorrectPredictions out of $totalRows " +
+        s"to be correct, but got only $numOfCorrectPredictions")
+  }
+
+  def validateModelFit(expLabelWeights: Array[Double],
+                       expModelData: Array[Array[Array[Double]]],
+                       expLogProbabilityData: Option[Array[Array[Array[Double]]]],
+                       model: GeneralNaiveBayesModel,
+                       expLaplaceSmoothing: Double = 1.0): Unit = {
+    //assert(0.1 ~== 0.1001  absTol 0.01, "mismatch") // approx equal
+
+    assert(model.labelWeights.toArray === expLabelWeights)
+    assert(model.laplaceSmoothing === expLaplaceSmoothing)
+
+    val expNumFeatures = expModelData.length
+    val expNumClasses = expModelData(0)(0).length
+    assert(model.numClasses === expNumClasses)
+    assert(model.numFeatures === expNumFeatures)
+
+    assert(model.modelData === expModelData)
+    if (expLogProbabilityData.isDefined) {
+      assert(model.logProbabilityData === expLogProbabilityData.get)
+    }
+  }
+
+
+  /**
+    * @param seed random seed
+    * @return simple data with random labels
+    */
+  def generateSmallRandomNaiveBayesInput(seed: Int): Seq[LabeledPoint] = {
+    val numLabels = 3
+    val rnd = new Random(seed)
+
+    // This represents the raw row data. Each row has the values for each attribute
+    val rawData: Array[Array[Double]] = Array(
+      Array(1.0, 2.0, 0.0, 2.0),
+      Array(2.0, 1.0, 1.0, 3.0),
+      Array(2.0, 2.0, 0.0, 2.0),
+      Array(0.0, 0.0, 0.0, 0.0),
+      Array(0.0, 1.0, 0.0, 1.0),
+      Array(0.0, 2.0, 0.0, 2.0)
+    )
+
+    val prob = 1.0 / numLabels
+    val probs = (0 until numLabels).map(x => prob).toArray
+    for (row <- rawData) yield {
+      val y = calcLabel(rnd.nextDouble(), probs)
+      LabeledPoint(y, Vectors.dense(row))
+    }
+  }
+
+  /**
+    * @return contrived data with 4 columns and 2 labels
+    */
+  def generateTypicalNaiveBayesInput(): Seq[LabeledPoint] = {
+    val numLabels = 2
+    // This represents the raw row data. Each row has the values for each attribute
+    val rawData: Array[Array[Double]] = Array(
+      Array(5.0, 6.0, 2.0, 3.0, 1.0),
+      Array(5.0, 7.0, 3.0, 5.0, 1.0),
+      Array(5.0, 5.0, 2.0, 2.0, 0.0),
+      Array(5.0, 5.0, 3.0, 3.0, 2.0),
+      Array(4.0, 5.0, 3.0, 3.0, 1.0),
+      Array(6.0, 5.0, 3.0, 2.0, 3.0),
+      Array(3.0, 5.0, 1.0, 2.0, 0.0),
+      Array(1.0, 2.0, 0.0, 3.0, 0.0),
+      Array(5.0, 4.0, 2.0, 1.0, 1.0),
+      Array(2.0, 4.0, 4.0, 1.0, 1.0)
+    )
+    val labels = Array(1.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0)
+
+    for (i <- rawData.indices) yield {
+      LabeledPoint(labels(i), Vectors.dense(rawData(i)))
+    }
+  }
+
+  /**
+    * If we just multiply conditional probabilities, numbers can underflow.
+    * To avoid this the code will instead add log values.
+    * To simulate a case where underflow can happen, consider the following case.
+    * Let's say we have a credit card fraud training data. The label is "fraud".
+    * Each of the 30 contrived columns has 2 values. Each of these columns represent
+    * some fictional property that if 0, then strongly tends toward not fraud, and if
+    * 1, then strongly tends toward fraud. Now, if we try to make a prediction for
+    * [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+    * it might predict not fraud, when it should really predict fraud because the all the small
+    * probabilities initially multiplied together might underflow and become 0.
+    *
+    * @param numRows number of rows of fake data
+    * @param numColumns of columns of fake data
+    * @param proportionLabel1 proportion of rows you want to have label1 the rest will have label2
+    * @param probDeviation This it the chance that the attribute values deviates
+    *                      from what is expected, given the label
+    * @return contrived data with 30 columns (of 2 values each) and 2 labels that
+    *         will result in underflow if multiplication of probabilities instead
+    *         of adding log values is used.
+    */
+  def generatePotentialUnderflowNaiveBayesInput(
+                                                 numRows: Int = 500, numColumns: Int = 40,
+                                                 proportionLabel1: Double = 0.8,
+                                                 probDeviation: Double = 0.1): Seq[LabeledPoint] = {
+    val numLabels = 2
+    val rng = new Random(seed = 1)
+
+    val dat = for (i <- 0 until numRows) yield {
+      val rndNum = rng.nextDouble()
+      val label = if (rndNum < proportionLabel1) 0.0 else 1.0
+      val func: (Int) => Double = {
+        if (label == 0) (x) => if (rng.nextDouble() < probDeviation) 1.0 else 0.0
+        else (x) => if (rng.nextDouble() < probDeviation) 0.0 else 1.0
+      }
+
+      val rawData = Array.tabulate[Double](numColumns)(func)
+      // println("raw = " + rawData.mkString(", "))
+      LabeledPoint(label, Vectors.dense(rawData))
+    }
+    // scalastyle:off println println()
+    // println("raw dat = " + dat.map(x => x.toString).mkString("\n "))
+    dat
+  }
+
+  /**
+    * @param p random number in range [0, 1)
+    * @param pi array of doubles [0, 1) that gives the probability distribution.
+    * @return randomly selects one of the labels given the probability distribution pi
+    */
+  private def calcLabel(p: Double, pi: Array[Double]): Int = {
+    var sum = 0.0
+    for (j <- pi.indices) {
+      sum += pi(j)
+      if (p < sum) return j
+    }
+    -1
+  }
+
+  /**
+    * Checks common requirements for [[Params.params]]:
+    *   - params are ordered by names
+    *   - param parent has the same UID as the object's UID
+    *   - param name is the same as the param method name
+    *   - obj.copy should return the same type as the obj
+    */
+  def checkParams(obj: Params): Unit = {
+    val clazz = obj.getClass
+
+    val params = obj.params
+    val paramNames = params.map(_.name)
+    require(paramNames === paramNames.sorted, "params must be ordered by names")
+    params.foreach { p =>
+      assert(p.parent === obj.uid)
+      assert(obj.getParam(p.name) === p)
+    }
+
+    val copyMethod = clazz.getMethod("copy", classOf[ParamMap])
+    val copyReturnType = copyMethod.getReturnType
+    require(copyReturnType === obj.getClass,
+      s"${clazz.getName}.copy should return ${clazz.getName} instead of ${copyReturnType.getName}.")
+  }
+
 }
 
 /*
