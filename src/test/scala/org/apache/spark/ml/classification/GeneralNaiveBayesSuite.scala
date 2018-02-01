@@ -17,17 +17,17 @@
 
 package org.apache.spark.ml.classification
 
+
 import org.scalatest.FunSuite
 
-import scala.util.Random
-import org.apache.spark.{SparkException}
-
 class GeneralNaiveBayesSuite extends FunSuite {
-  test("foo") {
+  test("foo_gnb") {
     assertResult(true) { 5 == 5 }
   }
 }
+
 /*
+import scala.util.Random
 import org.apache.spark.{SparkException, SparkFunSuite}
 import org.apache.spark.ml.classification.GeneralNaiveBayesSuite._
 import org.apache.spark.ml.feature.LabeledPoint
