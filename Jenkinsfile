@@ -56,14 +56,14 @@ pipeline {
         success {
             //if (!"SUCCESS".equals(currentBuild.getPreviousBuild())) {
                 echo 'This build was SUCCESSFUL!'
-                mail to: 'bbe@esi-group.com',
+                mail to: "${env.EMAIL_NOTIFICATION_LIST}",
                      subject: "Successful Pipeline: ${currentBuild.fullDisplayName}",
                      body: "This build succeeded: ${env.BUILD_URL}"
             //}
         }
         failure {
             echo 'This build FAILED!'
-            mail to: 'bbe@esi-group.com',
+            mail to: "${env.EMAIL_NOTIFICATION_LIST}",
                  subject: "Failed Pipeline: ${currentBuild.fullDisplayName}",
                  body: """Something is wrong with ${env.BUILD_URL}.
                    It is failing in ${env.FAILURE_STAGE} stage.
