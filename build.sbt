@@ -1,15 +1,16 @@
 name := "spark-gnb"
-version := "1.1-SPARK-2.1.1-SNAPSHOT"
+version := "1.2-SPARK-2.3.1-SNAPSHOT"
 organization := "org.apache.spark"
 scalaVersion := "2.11.11"
 spName := "apache/spark-gnb"
 //spIgnoreProvided := true,
-sparkVersion := "2.1.1"
+sparkVersion := "2.3.1-SNAPSHOT"
 sparkComponents ++= Seq("core", "sql", "mllib", "hive") //, "mllib-local")
 publishTo := Some("Artifactory Realm" at "http://esi-components.esi-group.com/artifactory/snapshot")
 credentials += Credentials(Path.userHome / ".m2" / ".credentials")
 publishMavenStyle := true
 licenses += "Apache-2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0.html")
+resolvers += Resolver.mavenLocal
 
 libraryDependencies ++= Seq(
   // dependencies for unit tests

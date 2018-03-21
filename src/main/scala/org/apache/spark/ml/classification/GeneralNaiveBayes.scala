@@ -216,6 +216,7 @@ object GeneralNaiveBayes extends DefaultParamsReadable[GeneralNaiveBayes] {
     * The evidence value to use if the conditional probability is exactly 1 (rare)
     * The evidence is actually infinite in this case, but it's better to limit it
     * to allow the small possibility of other class values in the prediction (see Laplace smoothing).
+    * This corresponds to a probability values of 1e-100.
     */
   val MAX_LOG_PROB = 100.0
 
@@ -303,7 +304,7 @@ class GeneralNaiveBayesModel private[ml] (
     * and there are no occurrences of a class within a specific attribute value.
     */
   val logProbabilityData = probabilityData.map(_.map(_.map(prob => {
-    if (prob == 0.0) -MAX_LOG_PROB else Math.log(prob)
+    if (prob == 0.0 || prob.isNaN) -MAX_LOG_PROB else Math.log(prob)
   }))
   )
 
@@ -334,8 +335,8 @@ class GeneralNaiveBayesModel private[ml] (
     // If the log probabilities got really small, update them so they will not be small.
     // This is the part that prevents underflow.
     val probs =
-    if (largestExp < -MAX_LOG_PROB) logProbs.map(_ - largestExp).map(math.exp)
-    else logProbs.map(math.exp)
+      if (largestExp < -MAX_LOG_PROB) logProbs.map(p => math.exp(p - largestExp))
+      else logProbs.map(math.exp)
     Vectors.dense(probs)
   }
 

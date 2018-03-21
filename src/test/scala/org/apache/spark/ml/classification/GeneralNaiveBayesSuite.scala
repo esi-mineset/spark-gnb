@@ -103,6 +103,59 @@ class GeneralNaiveBayesSuite extends FunSuite with DataFrameSuiteBase with Share
     validatePrediction(predictionAndLabels, 0.2)
   }
 
+  test("Naive Bayes: case where one of the label weights is 0") {
+    import sqlContext.implicits._
+
+    val testDataset =
+      generateNaiveBayesInputWith0LabelWeight(42).toDF()
+
+    val nb = new GeneralNaiveBayes().setSmoothing(0.0)
+    val model = nb.fit(testDataset)
+
+    val expLabelWeights = Array(0.0, 2.0, 4.0)
+    val expModelData = Array(
+      Array(Array(0.0, 1.0, 2.0), Array(0.0, 0.0, 1.0), Array(0.0, 1.0, 1.0)),
+      Array(Array(0.0, 1.0, 0.0), Array(0.0, 0.0, 2.0), Array(0.0, 1.0, 2.0)),
+      Array(Array(0.0, 2.0, 3.0), Array(0.0, 0.0, 1.0)),
+      Array(Array(0.0, 1.0, 0.0), Array(0.0, 0.0, 1.0), Array(0.0, 1.0, 2.0), Array(0.0, 0.0, 1.0))
+    )
+
+    val expLogProbabilityData = Array(
+      Array(
+        Array(-100.0, -0.6931471805599453, -0.6931471805599453),
+        Array(-100.0, -100.0, -1.3862943611198906),
+        Array(-100.0, -0.6931471805599453, -1.3862943611198906)
+      ),
+      Array(
+        Array(-100.0, -0.6931471805599453, -100.0),
+        Array(-100.0, -100.0, -0.6931471805599453),
+        Array(-100.0, -0.6931471805599453, -0.6931471805599453)
+      ),
+      Array(
+        Array(-100.0, 0.0, -0.2876820724517809),
+        Array(-100.0, -100.0, -1.3862943611198906)
+      ),
+      Array(
+        Array(-100.0, -0.6931471805599453, -100.0),
+        Array(-100.0, -100.0, -1.3862943611198906),
+        Array(-100.0, -0.6931471805599453, -0.6931471805599453),
+        Array(-100.0, -100.0, -1.3862943611198906)
+      )
+    )
+
+    validateModelFit(expLabelWeights, expModelData, Some(expLogProbabilityData), model, expLaplaceSmoothing = 0)
+    assert(model.hasParent)
+
+    val validationDataset =
+      generateSmallRandomNaiveBayesInput(17).toDF()
+
+    val predictionAndLabels: DataFrame =
+      model.transform(validationDataset).select("prediction", "label")
+
+    // Since the labels are random, we do not expect high accuracy
+    validatePrediction(predictionAndLabels, 0.2)
+  }
+
   test("Naive Bayes on Typical Data") {
     import sqlContext.implicits._
 
@@ -538,6 +591,31 @@ class GeneralNaiveBayesSuite extends FunSuite with DataFrameSuiteBase with Share
 
     val prob = 1.0 / numLabels
     val probs = (0 until numLabels).map(x => prob).toArray
+    for (row <- rawData) yield {
+      val y = calcLabel(rnd.nextDouble(), probs)
+      LabeledPoint(y, Vectors.dense(row))
+    }
+  }
+
+  /**
+    * Edge case.
+    * @param seed random seed
+    * @return data where one of the labels (the first)  has no occurrence (0 weight)
+    */
+  def generateNaiveBayesInputWith0LabelWeight(seed: Int): Seq[LabeledPoint] = {
+    val rnd = new Random(seed)
+
+    // This represents the raw row data. Each row has the values for each attribute
+    val rawData: Array[Array[Double]] = Array(
+      Array(1.0, 2.0, 0.0, 2.0),
+      Array(2.0, 1.0, 1.0, 3.0),
+      Array(2.0, 2.0, 0.0, 2.0),
+      Array(0.0, 0.0, 0.0, 0.0),
+      Array(0.0, 1.0, 0.0, 1.0),
+      Array(0.0, 2.0, 0.0, 2.0)
+    )
+
+    val probs = Array(0, 0.5, 0.5)
     for (row <- rawData) yield {
       val y = calcLabel(rnd.nextDouble(), probs)
       LabeledPoint(y, Vectors.dense(row))
