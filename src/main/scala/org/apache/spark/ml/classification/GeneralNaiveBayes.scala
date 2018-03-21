@@ -287,7 +287,8 @@ class GeneralNaiveBayesModel private[ml] (
     dataForFeature.map(dataForValue => {
       var i = 0
       dataForValue.map(v => {
-        val denom = labelWeights(i) + laplaceDenom
+        val adjustedWt = labelWeights(i) + laplaceDenom
+        val denom = if (adjustedWt == 0) 1.0 else adjustedWt
         i += 1
         (v + laplaceSmoothing) / denom
       })
