@@ -258,7 +258,7 @@ class GeneralNaiveBayesSuite extends FunSuite with DataFrameSuiteBase with Share
 
 
   /**
-    * Underflowing used to be a problem when propabilities were multpiplied.
+    * Underflowing used to be a problem when probabilities were multiplied.
     * Now log probabilities are added - which is much less susceptible to underflow
     */
   test("Naive Bayes on potentially underflowing (numRows = 20 numCols = 10)") {
@@ -600,7 +600,7 @@ class GeneralNaiveBayesSuite extends FunSuite with DataFrameSuiteBase with Share
   /**
     * Edge case.
     * @param seed random seed
-    * @return data where one of the labels (the first)  has no occurrence (0 weight)
+    * @return data where one of the labels (the first) has no occurrences (0 weight)
     */
   def generateNaiveBayesInputWith0LabelWeight(seed: Int): Seq[LabeledPoint] = {
     val rnd = new Random(seed)
@@ -849,9 +849,7 @@ object GeneralNaiveBayesSuite {
          numRows: Int = 500, numColumns: Int = 40,
          proportionLabel1: Double = 0.8,
          probDeviation: Double = 0.1): Seq[LabeledPoint] = {
-    val numLabels = 2
     val rng = new Random(seed = 1)
-
     val dat = for (i <- 0 until numRows) yield {
       val rndNum = rng.nextDouble()
       val label = if (rndNum < proportionLabel1) 0.0 else 1.0

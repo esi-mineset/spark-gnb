@@ -275,7 +275,8 @@ class GeneralNaiveBayesModel private[ml] (
 
   private val totalWeight: Double = labelWeights.toArray.sum
   private val priorProbabilities: Array[Double] = labelWeights.toArray.map(_ / totalWeight)
-  private val priorLogProbabilities: Array[Double] = priorProbabilities.map(Math.log)
+  private val priorLogProbabilities: Array[Double] =
+    priorProbabilities.map(v => if (v > 0) Math.log(v) else -MAX_LOG_PROB)
 
   private val laplaceDenom = laplaceSmoothing * numClasses
 
