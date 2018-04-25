@@ -10,7 +10,7 @@ publishTo := Some("Artifactory Realm" at "http://esi-components.esi-group.com/ar
 credentials += Credentials(Path.userHome / ".m2" / ".credentials")
 publishMavenStyle := true
 licenses += "Apache-2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0.html")
-resolvers += Resolver.mavenLocal
+//resolvers += Resolver.mavenLocal
 
 libraryDependencies ++= Seq(
   // dependencies for unit tests
